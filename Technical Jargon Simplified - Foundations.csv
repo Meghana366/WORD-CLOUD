@@ -1,0 +1,21 @@
+Name,Definition (with Simple Analogy)
+Website,"A collection of connected web pages under one name. Think of it as a book, and each page is a chapter."
+Webpage,A single page of a website. Like one page in a magazine.
+Browser,The app that opens websites (like Chrome or Safari). It’s your TV screen for the internet.
+Frontend,The visible part users interact with. Like a shop’s display window.
+Backend,The invisible part that handles data and logic. Like the storeroom where the real work happens.
+Full Stack,Both frontend and backend working together. Like someone who can cook and serve the meal.
+Client,The device or app asking for info. Like a customer placing an order.
+Server,The computer sending that info back. Like a restaurant kitchen fulfilling the order.
+URL,The exact web address. Like a house address on a map.
+Domain,The main name of a website (e.g. example.com). Like a store name on a street.
+Hosting,The space where your site files live. Like renting a shop for your business.
+IP Address,A unique number for every computer online. Like a phone number for your device.
+DNS,Connects domain names to IPs. Like the contacts list that turns a name into a number.
+HTTP / HTTPS,The language browsers and servers use to talk; HTTPS is secure. Like talking vs. whispering in a locked room.
+SSL Certificate,Proves a site is safe (the padlock icon). Like a security badge at a building entrance.
+Bandwidth,How much data can move between you and the site. Like the width of a water pipe.
+Latency,The time it takes for data to travel. Like a delivery delay for a package.
+Cache,Temporary storage that loads things faster. Like a shortcut drawer for things you use often.
+Cookie,Small data that remembers preferences. Like a sticky note for your login info.
+Session,The period you’re actively on a site. Like your time inside a café before leaving.

@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<!-- This tells the browser this is an HTML5 document -->
+<html lang="en">
+<!-- The opening HTML tag - "en" means the page is in English -->
+<head>
+    <!-- The head section contains information about the page (not visible to users) -->
+    <meta charset="UTF-8">
+    <!-- This tells the browser to use UTF-8 character encoding (supports all languages) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- This makes the page work well on mobile devices -->
+    <title>Tech Terms Word Cloud</title>
+    <!-- This is the text that appears in the browser tab -->
+    
+    <!-- Load the WordCloud.js library from the internet (CDN) -->
+    <!-- This library helps us create the word cloud visualization -->
+    <!-- Using a reliable CDN source -->
+    <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.js"></script>
+    
+    <!-- Load the PapaParse library from the internet (CDN) -->
+    <!-- This library helps us read CSV files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- Load the SheetJS (xlsx) library from the internet (CDN) -->
+    <!-- This library helps us read Excel (.xlsx) files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* CSS (Cascading Style Sheets) - This controls how the page looks */
+        
+        /* The asterisk (*) means "select all elements" */
+        /* This resets default margins and padding for all elements */
+        * {
+            margin: 0;  /* Remove default spacing outside elements */
+            padding: 0;  /* Remove default spacing inside elements */
+            box-sizing: border-box;  /* Makes width calculations include padding and borders */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1400px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .note {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-style: italic;
+            font-size: 1.1em;
+        }
+
+        .content-wrapper {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .word-cloud-section {
+            flex: 1;
+        }
+
+        #word-cloud-canvas {
+            width: 100%;
+            height: 600px;
+            min-width: 800px;
+            min-height: 600px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: #fafafa;
+            margin: 20px 0;
+            cursor: pointer;
+            display: block;
+        }
+
+        .definitions-panel {
+            width: 350px;
+            max-height: 600px;
+            overflow-y: auto;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            background: #f9f9f9;
+            margin-top: 20px;
+        }
+
+        .definitions-panel h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .word-item {
+            margin-bottom: 15px;
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .word-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .word-item.selected {
+            border-left-color: #764ba2;
+            background: #f0f0ff;
+        }
+
+        .word-title {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .word-definition {
+            color: #666;
+            line-height: 1.5;
+            font-size: 0.95em;
+        }
+
+        .file-input-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .file-input-container input[type="file"] {
+            padding: 10px;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            background: #f5f5f5;
+            cursor: pointer;
+        }
+
+        .word-count {
+            text-align: center;
+            color: #666;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .tooltip {
+            position: fixed;
+            background: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 10000;
+            max-width: 300px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            display: none;
+            left: 0;
+            top: 0;
+        }
+
+        .tooltip-word {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #ffd700;
+        }
+
+        .tooltip-definition {
+            line-height: 1.4;
+        }
+
+        @media (max-width: 968px) {
+            .content-wrapper {
+                flex-direction: column;
+            }
+            .definitions-panel {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- The body section contains everything visible on the page -->
+    
+    <!-- Main container that holds all the content -->
+    <div class="container">
+        <!-- Main heading (h1 = largest heading) -->
+        <h1>Tech Terms Word Cloud</h1>
+        
+        <!-- Note telling users how to interact with the page -->
+        <p class="note">Hover on a word to see its meaning.</p>
+        
+        <!-- Container for the file upload button -->
+        <div class="file-input-container">
+            <!-- File input button - allows users to select a CSV or XLSX file -->
+            <input type="file" id="fileInput" accept=".csv,.xlsx" />
+        </div>
+
+        <!-- Container that holds the word cloud and definitions side by side -->
+        <div class="content-wrapper">
+            <!-- Left section: Word cloud visualization -->
+            <div class="word-cloud-section">
+                <!-- Instruction for users -->
+                <p style="text-align: center; color: #666; margin-bottom: 10px; font-style: italic;">
+                    Click anywhere on the word cloud to see all words and their definitions
+                </p>
+                <!-- Canvas element - this is where the word cloud will be drawn -->
+                <canvas id="word-cloud-canvas"></canvas>
+                <!-- Display area for the word count -->
+                <div class="word-count" id="wordCount"></div>
+            </div>
+            
+            <!-- Right section: List of word definitions -->
+            <div class="definitions-panel" id="definitionsPanel">
+                <!-- Heading for the definitions panel -->
+                <h3>Word Definitions</h3>
+                <!-- Container where the list of words and definitions will be displayed -->
+                <div id="definitionsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tooltip box - appears when hovering over words (hidden by default) -->
+    <div class="tooltip" id="tooltip">
+        <!-- Area to display the word in the tooltip -->
+        <div class="tooltip-word" id="tooltipWord"></div>
+        <!-- Area to display the definition in the tooltip -->
+        <div class="tooltip-definition" id="tooltipDefinition"></div>
+    </div>
+
+    <script>
+        let wordsData = [];
+        let definitions = {};
+        let wordList = [];  // Store words in lowercase for lookup
+        let wordDisplayMap = {};  // Map lowercase words to their original display format
+        let positionTooltipHandler = null; // Store the tooltip position handler for cleanup
+        let wordPositions = [];  // Store positions of words in the cloud for click detection
+
+        // JavaScript code starts here - this makes the page interactive
+        
+        // Wait for the page to fully load before running our code
+        // DOMContentLoaded means the HTML structure is ready
+        window.addEventListener('DOMContentLoaded', () => {
+            // Wait a bit for all scripts (especially CDN libraries) to load
+            // Check if WordCloud library is loaded, wait if not
+            function checkLibrariesAndLoad() {
+                if (typeof WordCloud !== 'undefined' && typeof Papa !== 'undefined') {
+                    console.log('All libraries loaded successfully!');
+                    // Try to automatically load a default file if one exists
+                    loadDefaultFile();
+                } else {
+                    console.log('Waiting for libraries to load...');
+                    // Check again in 100ms
+                    setTimeout(checkLibrariesAndLoad, 100);
+                }
+            }
+            checkLibrariesAndLoad();
+        });
+
+        // Listen for when the user selects a file using the file input button
+        // When a file is selected, the 'change' event fires and we call handleFile function
+        document.getElementById('fileInput').addEventListener('change', handleFile);
+
+        async function loadDefaultFile() {
+            // List of file names to try loading automatically
+            // Try to load terms.xlsx or terms.csv first, then fallback to the CSV file we have
+            const filesToTry = ['terms.xlsx', 'terms.csv', 'Technical Jargon Simplified - Foundations.csv'];
+            
+            // Try each file name in order
+            for (const fileName of filesToTry) {
+                try {
+                    // Check if this is a CSV file
+                    if (fileName.endsWith('.csv')) {
+                        // Try to fetch the CSV file from the server
+                        const response = await fetch(fileName);
+                        // If file exists and loaded successfully
+                        if (response.ok) {
+                            // Read the file as text
+                            const text = await response.text();
+                            // Process the CSV data
+                            processCSV(text);
+                            // Stop trying other files since we found one
+                            return;
+                        }
+                    } else if (fileName.endsWith('.xlsx')) {
+                        // Try to fetch the XLSX file from the server
+                        const response = await fetch(fileName);
+                        // If file exists and loaded successfully
+                        if (response.ok) {
+                            // Read the file as binary data (array buffer)
+                            const arrayBuffer = await response.arrayBuffer();
+                            // Process the XLSX data
+                            processXLSX(arrayBuffer);
+                            // Stop trying other files since we found one
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    // If there was an error loading this file, try the next one
+                    continue;
+                }
+            }
+            // If we get here, none of the files were found
+            console.log('No default file found, waiting for file input...');
+        }
+
+        function handleFile(event) {
+            // Get the file that the user selected
+            const file = event.target.files[0];
+            // If no file was selected, do nothing
+            if (!file) return;
+
+            // Convert file name to lowercase for easier checking
+            const fileName = file.name.toLowerCase();
+            
+            // Check if the file is a CSV file
+            if (fileName.endsWith('.csv')) {
+                // Create a FileReader to read the file
+                const reader = new FileReader();
+                // When file is loaded, process it as CSV
+                reader.onload = (e) => processCSV(e.target.result);
+                // Start reading the file as text
+                reader.readAsText(file);
+            } else if (fileName.endsWith('.xlsx')) {
+                // Create a FileReader to read the file
+                const reader = new FileReader();
+                // When file is loaded, process it as XLSX
+                reader.onload = (e) => processXLSX(e.target.result);
+                // Start reading the file as binary data (array buffer)
+                reader.readAsArrayBuffer(file);
+            } else {
+                // If file is not CSV or XLSX, show an error message
+                alert('Please select a CSV or XLSX file.');
+            }
+        }
+
+        function processCSV(csvText) {
+            // Reset all data storage variables
+            wordsData = [];
+            definitions = {};
+            wordList = [];
+            wordDisplayMap = {};  // Reset the display map
+
+            // Use PapaParse library to read the CSV file
+            Papa.parse(csvText, {
+                header: true,  // First row contains column names
+                skipEmptyLines: true,  // Ignore empty lines
+                complete: function(results) {
+                    // Process each row of data
+                    results.data.forEach(row => {
+                        // Try to find the word column (handle different column name variations)
+                        const word = row['Word'] || row['Name'] || row['word'] || row['name'];
+                        // Try to find the definition column (handle different column name variations)
+                        const definition = row['Definition'] || row['Definition (with Simple Analogy)'] || 
+                                          row['definition'] || row['Description'] || row['description'];
+
+                        // Only process rows that have a word
+                        if (word && word.trim()) {
+                            // Get the original word with proper casing
+                            const wordOriginal = word.trim();
+                            // Convert word to lowercase for storage and lookup
+                            const wordLower = wordOriginal.toLowerCase();
+                            // Store the definition (or use a default message if none exists)
+                            definitions[wordLower] = definition || 'No definition available';
+                            // Store the original display format of the word
+                            wordDisplayMap[wordLower] = wordOriginal;
+                            // Add the word to our list (use lowercase for consistency)
+                            wordList.push(wordLower);
+                        }
+                    });
+
+                    // Generate the word cloud visualization
+                    generateWordCloud();
+                    // Display the list of definitions
+                    renderDefinitionsList();
+                },
+                error: function(error) {
+                    // If there's an error reading the CSV, show an alert
+                    console.error('Error parsing CSV:', error);
+                    alert('Error reading CSV file. Please check the file format.');
+                }
+            });
+        }
+
+        function processXLSX(arrayBuffer) {
+            // Reset all data storage variables
+            wordsData = [];
+            definitions = {};
+            wordList = [];
+            wordDisplayMap = {};  // Reset the display map
+
+            try {
+                // Use SheetJS library to read the XLSX file
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                
+                // Process all sheets in the workbook (Excel files can have multiple sheets)
+                workbook.SheetNames.forEach(sheetName => {
+                    // Get the worksheet data for this sheet
+                    const worksheet = workbook.Sheets[sheetName];
+                    // Convert the worksheet to a JavaScript object (array of rows)
+                    const data = XLSX.utils.sheet_to_json(worksheet);
+
+                    // Process each row in this sheet
+                    data.forEach(row => {
+                        // Try to find the word column (handle different column name variations)
+                        const word = row['Word'] || row['Name'] || row['word'] || row['name'];
+                        // Try to find the definition column (handle different column name variations)
+                        const definition = row['Definition'] || row['Definition (with Simple Analogy)'] || 
+                                          row['definition'] || row['Description'] || row['description'];
+
+                        // Only process rows that have a word
+                        if (word && word.trim()) {
+                            // Get the original word with proper casing
+                            const wordOriginal = word.trim();
+                            // Convert word to lowercase for storage and lookup
+                            const wordLower = wordOriginal.toLowerCase();
+                            // Only add if not already added (to avoid duplicates across sheets)
+                            if (!definitions[wordLower]) {
+                                // Store the definition (or use a default message if none exists)
+                                definitions[wordLower] = definition || 'No definition available';
+                                // Store the original display format of the word
+                                wordDisplayMap[wordLower] = wordOriginal;
+                                // Add the word to our list (use lowercase for consistency)
+                                wordList.push(wordLower);
+                            }
+                        }
+                    });
+                });
+
+                // Generate the word cloud visualization
+                generateWordCloud();
+                // Display the list of definitions
+                renderDefinitionsList();
+            } catch (error) {
+                // If there's an error reading the XLSX file, show an alert
+                console.error('Error processing XLSX file:', error);
+                alert('Error reading XLSX file. Please check the file format.');
+            }
+        }
+
+        function generateWordCloud() {
+            // Check if we have any words to display
+            if (wordList.length === 0) {
+                // Show a message if no words were found
+                document.getElementById('wordCount').textContent = 'No words found in the file.';
+                return;
+            }
+
+            // Count how many times each word appears (in case there are duplicates)
+            const wordFreq = {};
+            wordList.forEach(word => {
+                // If word already exists, increment count; otherwise set to 1
+                wordFreq[word] = (wordFreq[word] || 0) + 1;
+            });
+
+            // Convert to WordCloud format: each word needs to be [word, weight]
+            // Weight determines the size - higher weight = bigger word
+            // Use simpler weight calculation to ensure words are visible
+            const maxFreq = Math.max(...Object.values(wordFreq));
+            wordsData = Object.keys(wordFreq).map(word => {
+                // Normalize weights so all words are visible
+                const weight = 10 + (wordFreq[word] / maxFreq) * 40;
+                // Use the original display format of the word (not lowercase)
+                const displayWord = wordDisplayMap[word] || word.charAt(0).toUpperCase() + word.slice(1);
+                return [displayWord, weight];
+            });
+            
+            console.log('Words data prepared:', wordsData);
+
+            // Check if WordCloud library is loaded
+            // WordCloud2.js uses 'WordCloud' as the function name
+            if (typeof WordCloud === 'undefined') {
+                console.error('WordCloud library is not loaded!');
+                console.log('Available global objects:', Object.keys(window).filter(k => k.includes('Word') || k.includes('word')));
+                document.getElementById('wordCount').textContent = 'Error: WordCloud library failed to load. Please check your internet connection and refresh the page.';
+                // Show a message on the canvas
+                const canvas = document.getElementById('word-cloud-canvas');
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ff0000';
+                    ctx.font = '20px Arial';
+                    ctx.fillText('WordCloud library not loaded. Please refresh.', 50, 300);
+                }
+                return;
+            }
+            
+            console.log('WordCloud library loaded successfully!');
+
+            // Get the canvas element where we'll draw the word cloud
+            const canvas = document.getElementById('word-cloud-canvas');
+            
+            // Make sure the canvas element exists before trying to use it
+            if (!canvas) {
+                console.error('Canvas element not found!');
+                return;
+            }
+            
+            // Use a small delay to ensure the page is fully rendered
+            // This gives the browser time to calculate the correct canvas size
+            setTimeout(() => {
+                // Set canvas dimensions to match its display size
+                // This ensures the word cloud renders at the correct resolution
+                const rect = canvas.getBoundingClientRect();
+                
+                // Make sure we have valid dimensions (at least 100x100 pixels)
+                const width = Math.max(rect.width || 800, 800);
+                const height = Math.max(rect.height || 600, 600);
+                
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Get the 2D drawing context (like getting a paintbrush to draw on the canvas)
+                const ctx = canvas.getContext('2d');
+                
+                // Clear any previous word cloud by clearing the entire canvas
+                // clearRect clears a rectangle: (x, y, width, height)
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Fill the canvas with the background color first
+                ctx.fillStyle = '#fafafa';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Generate the word cloud using the WordCloud library
+                // This draws all the words on the canvas in a cloud formation
+                try {
+                    // Log the data being used (for debugging)
+                    console.log('Generating word cloud with', wordsData.length, 'words');
+                    console.log('Sample words data:', wordsData.slice(0, 5));  // Show first 5 words
+                    console.log('Canvas size:', canvas.width, 'x', canvas.height);
+                    console.log('WordCloud function type:', typeof WordCloud);
+                    
+                    // Check if we have valid data
+                    if (!wordsData || wordsData.length === 0) {
+                        console.error('No words data to display!');
+                        ctx.fillStyle = '#666666';
+                        ctx.font = '20px Arial';
+                        ctx.fillText('No words found to display', 50, 300);
+                        return;
+                    }
+                    
+                    // Reset word positions array
+                    wordPositions = [];
+                    
+                    // Call the WordCloud function to draw the word cloud
+                    // Use simpler configuration that's more reliable
+                    // WordCloud.js doesn't provide word positions directly in the callback
+                    // So we'll use a different approach: store words and use canvas pixel detection
+                    // First, let's draw the cloud and then create a click map
+                    
+                    WordCloud(canvas, {
+                        list: wordsData,  // The array of words and their weights
+                        gridSize: 8,  // Size of the grid for word placement
+                        weightFactor: function(size) {
+                            // Simple size calculation - ensure words are big enough to see
+                            return size * 2;
+                        },
+                        fontFamily: 'Times, serif',  // Font to use for words
+                        color: function(word, weight, fontSize, distance, theta) {
+                            // Store word information for click detection
+                            // We'll use a unique color for each word to detect clicks
+                            const wordIndex = wordsData.findIndex(w => w[0] === word);
+                            const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#43e97b', '#fa709a', '#fee140', '#30cfd0', '#330867'];
+                            return colors[wordIndex % colors.length];
+                        },
+                        rotateRatio: 0,  // Don't rotate words for now (set to 0 for simplicity)
+                        backgroundColor: 'transparent',  // Transparent background (we already filled it)
+                        minSize: 8,  // Smallest font size for words
+                        drawOutOfBound: false,  // Don't draw words outside canvas
+                        shrinkToFit: false  // Don't shrink words
+                    });
+                    
+                    console.log('Word cloud generated successfully!');
+                    console.log('Click on the word cloud to see all words and select one to view its definition');
+                    
+                    // Setup hover detection for tooltip after word cloud is generated
+                    setupHoverDetection(canvas);
+                } catch (error) {
+                    // If word cloud generation fails, show an error message and try fallback
+                    console.error('Error generating word cloud:', error);
+                    console.error('Error details:', error.stack);
+                    
+                    // Try a fallback: draw words manually in a simple grid
+                    drawFallbackWordCloud(canvas, ctx, wordsData);
+                    document.getElementById('wordCount').textContent = 'Word cloud generated (fallback mode). Total words: ' + wordList.length;
+                }
+            }, 100);  // Wait 100 milliseconds for the page to finish rendering
+
+            // Update word count (this happens immediately, before the word cloud is drawn)
+            document.getElementById('wordCount').textContent = `Total words: ${wordList.length}`;
+
+            // Setup hover detection for tooltip (we'll do this after the cloud is generated)
+            // Move this inside the setTimeout so it happens after the cloud is created
+        }
+
+        function renderDefinitionsList() {
+            // Get the container where we'll show the definitions
+            const definitionsList = document.getElementById('definitionsList');
+            
+            // Clear any existing definitions
+            definitionsList.innerHTML = '';
+
+            // Sort words alphabetically (create a copy so we don't modify the original)
+            const sortedWords = [...wordList].sort();
+
+            sortedWords.forEach(word => {
+                // Get the original display format of the word
+                const displayWord = wordDisplayMap[word] || word.charAt(0).toUpperCase() + word.slice(1);
+                
+                // Create a container div for each word and its definition
+                const wordItem = document.createElement('div');
+                wordItem.className = 'word-item';
+                wordItem.dataset.word = word.toLowerCase();  // Store lowercase for lookup
+
+                const wordTitle = document.createElement('div');
+                wordTitle.className = 'word-title';
+                wordTitle.textContent = displayWord;  // Display original format
+
+                const wordDef = document.createElement('div');
+                wordDef.className = 'word-definition';
+                wordDef.textContent = definitions[word.toLowerCase()];
+
+                wordItem.appendChild(wordTitle);
+                wordItem.appendChild(wordDef);
+                definitionsList.appendChild(wordItem);
+
+                // When user hovers over a word item, highlight it and show tooltip
+                wordItem.addEventListener('mouseenter', function(event) {
+                    // Get the word from the data attribute (it's stored in lowercase)
+                    const hoveredWordKey = this.dataset.word || word;
+                    // Get the original display format
+                    const hoveredDisplayWord = wordDisplayMap[hoveredWordKey] || hoveredWordKey.charAt(0).toUpperCase() + hoveredWordKey.slice(1);
+                    // Get the definition
+                    const hoveredDefinition = definitions[hoveredWordKey] || 'No definition available';
+                    
+                    // Remove highlight from all other words
+                    document.querySelectorAll('.word-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    // Add highlight to the current word
+                    this.classList.add('selected');
+                    // Show the tooltip with the word and its definition
+                    // Pass the event so we can position the tooltip correctly
+                    showTooltip(hoveredDisplayWord, hoveredDefinition, event);
+                });
+
+                // When user moves mouse away from a word item, hide the tooltip
+                wordItem.addEventListener('mouseleave', function(event) {
+                    // Remove highlight
+                    this.classList.remove('selected');
+                    // Hide the tooltip
+                    hideTooltip();
+                });
+                
+                // Also show tooltip when mouse moves over the word item
+                wordItem.addEventListener('mousemove', function(event) {
+                    // Update tooltip position as mouse moves
+                    const tooltip = document.getElementById('tooltip');
+                    if (tooltip && tooltip.style.display === 'block') {
+                        positionTooltip(event);
+                    }
+                });
+            });
+        }
+
+        // Fallback function to draw words manually if WordCloud library fails
+        function drawFallbackWordCloud(canvas, ctx, wordsData) {
+            console.log('Using fallback word cloud drawing method');
+            
+            // Clear canvas
+            ctx.fillStyle = '#fafafa';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw words in a grid layout
+            const cols = Math.ceil(Math.sqrt(wordsData.length));
+            const cellWidth = canvas.width / cols;
+            const cellHeight = canvas.height / cols;
+            
+            const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#43e97b', '#fa709a', '#fee140', '#30cfd0', '#330867'];
+            
+            wordsData.forEach((item, index) => {
+                const [word, weight] = item;
+                const col = index % cols;
+                const row = Math.floor(index / cols);
+                
+                const x = col * cellWidth + cellWidth / 2;
+                const y = row * cellHeight + cellHeight / 2;
+                
+                // Calculate font size based on weight
+                const fontSize = Math.max(12, Math.min(weight, 40));
+                
+                ctx.fillStyle = colors[index % colors.length];
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(word, x, y);
+            });
+        }
+
+        function setupHoverDetection(canvas) {
+            // Set the cursor to pointer when hovering over the canvas
+            canvas.style.cursor = 'pointer';
+            
+            // Add click handler to detect which word was clicked
+            canvas.addEventListener('click', function(event) {
+                handleWordCloudClick(event, canvas);
+            });
+            
+            // Add hover handler to show tooltip when hovering over words
+            canvas.addEventListener('mousemove', function(event) {
+                handleWordCloudHover(event, canvas);
+            });
+            
+            canvas.addEventListener('mouseleave', function() {
+                hideTooltip();
+            });
+        }
+        
+        function handleWordCloudClick(event, canvas) {
+            // Show a word selector modal when clicking on the word cloud
+            showWordSelectorModal(event);
+        }
+        
+        function handleWordCloudHover(event, canvas) {
+            // Get the hover position relative to the canvas
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            // Scale coordinates to match canvas internal dimensions
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const canvasX = x * scaleX;
+            const canvasY = y * scaleY;
+            
+            // Find which word is being hovered
+            const hoveredWord = findWordAtPosition(canvasX, canvasY);
+            
+            if (hoveredWord) {
+                // Change cursor to pointer
+                canvas.style.cursor = 'pointer';
+                
+                // Optionally show a preview tooltip
+                // (Uncomment if you want tooltips on hover too)
+                // const wordKey = hoveredWord.toLowerCase();
+                // const displayWord = wordDisplayMap[wordKey] || hoveredWord;
+                // const definition = definitions[wordKey];
+                // if (definition) {
+                //     showTooltip(displayWord, definition, event);
+                // }
+            } else {
+                canvas.style.cursor = 'default';
+            }
+        }
+        
+        // Create a map of pixel colors to words for click detection
+        let wordColorMap = {};
+        let clickDetectionCanvas = null;
+        
+        function createWordClickMap(canvas, wordsData) {
+            // Create a hidden canvas to draw words with unique colors for click detection
+            clickDetectionCanvas = document.createElement('canvas');
+            clickDetectionCanvas.width = canvas.width;
+            clickDetectionCanvas.height = canvas.height;
+            const clickCtx = clickDetectionCanvas.getContext('2d');
+            
+            // Fill with transparent background
+            clickCtx.fillStyle = 'transparent';
+            clickCtx.fillRect(0, 0, clickDetectionCanvas.width, clickDetectionCanvas.height);
+            
+            // We'll use a simpler approach: draw words again with unique identifiers
+            // and use pixel color detection
+            console.log('Creating word click map...');
+        }
+        
+        // Show a modal with all words when clicking on the word cloud
+        function showWordSelectorModal(event) {
+            // Remove existing modal if any
+            const existingModal = document.getElementById('wordSelectorModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            // Create modal overlay
+            const modal = document.createElement('div');
+            modal.id = 'wordSelectorModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 10000;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            `;
+            
+            // Create modal content
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                max-width: 600px;
+                max-height: 80vh;
+                overflow-y: auto;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+                position: relative;
+            `;
+            
+            // Modal header
+            const header = document.createElement('h2');
+            header.textContent = 'Click on a word to see its definition:';
+            header.style.cssText = 'margin-bottom: 20px; color: #333; font-size: 1.5em;';
+            
+            // Close button
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '×';
+            closeBtn.style.cssText = `
+                position: absolute;
+                top: 10px;
+                right: 15px;
+                background: none;
+                border: none;
+                font-size: 30px;
+                cursor: pointer;
+                color: #999;
+                width: 30px;
+                height: 30px;
+                line-height: 30px;
+            `;
+            closeBtn.onclick = function() {
+                modal.remove();
+            };
+            
+            // Words container
+            const wordsContainer = document.createElement('div');
+            wordsContainer.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 10px;
+            `;
+            
+            // Add each word as a clickable button
+            const sortedWords = [...wordList].sort();
+            sortedWords.forEach(word => {
+                const displayWord = wordDisplayMap[word] || word.charAt(0).toUpperCase() + word.slice(1);
+                const wordButton = document.createElement('button');
+                wordButton.textContent = displayWord;
+                wordButton.style.cssText = `
+                    padding: 12px;
+                    background: #667eea;
+                    color: white;
+                    border: none;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: background 0.2s;
+                `;
+                wordButton.onmouseenter = function() {
+                    this.style.background = '#764ba2';
+                };
+                wordButton.onmouseleave = function() {
+                    this.style.background = '#667eea';
+                };
+                wordButton.onclick = function() {
+                    // Show the definition
+                    const definition = definitions[word];
+                    showWordDefinition(displayWord, definition, event);
+                    // Highlight in definitions list
+                    highlightWordInList(word);
+                    // Close modal
+                    modal.remove();
+                };
+                wordsContainer.appendChild(wordButton);
+            });
+            
+            // Assemble modal
+            modalContent.appendChild(closeBtn);
+            modalContent.appendChild(header);
+            modalContent.appendChild(wordsContainer);
+            modal.appendChild(modalContent);
+            
+            // Close modal when clicking outside
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            };
+            
+            // Add to page
+            document.body.appendChild(modal);
+        }
+        
+        function showWordDefinition(word, definition, event) {
+            // Show tooltip with definition
+            showTooltip(word, definition, event);
+            
+            // Also scroll to word in definitions list
+            const wordKey = word.toLowerCase();
+            scrollToWordInList(wordKey);
+        }
+        
+        function highlightWordInList(wordKey) {
+            // Remove highlight from all words
+            document.querySelectorAll('.word-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Find and highlight the clicked word
+            const wordItems = document.querySelectorAll('.word-item');
+            wordItems.forEach(item => {
+                if (item.dataset.word === wordKey.toLowerCase()) {
+                    item.classList.add('selected');
+                    // Scroll the word into view
+                    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            });
+        }
+        
+        function scrollToWordInList(wordKey) {
+            // Scroll the definitions panel into view
+            const definitionsPanel = document.getElementById('definitionsPanel');
+            if (definitionsPanel) {
+                definitionsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function showTooltip(word, definition, event) {
+            // Get the tooltip elements from the page
+            const tooltip = document.getElementById('tooltip');
+            const tooltipWord = document.getElementById('tooltipWord');
+            const tooltipDefinition = document.getElementById('tooltipDefinition');
+
+            // Make sure we have valid elements
+            if (!tooltip || !tooltipWord || !tooltipDefinition) {
+                console.error('Tooltip elements not found!');
+                return;
+            }
+
+            // Set the word and definition text in the tooltip
+            // Make sure to use the original word format
+            const displayWord = word;
+            tooltipWord.textContent = displayWord;
+            tooltipDefinition.textContent = definition || 'No definition available';
+            
+            // Position the tooltip immediately if we have mouse event
+            if (event) {
+                positionTooltip(event);
+            } else {
+                // Set initial position (will be updated on mouse move)
+                tooltip.style.left = '100px';
+                tooltip.style.top = '100px';
+            }
+            
+            // Make tooltip visible
+            tooltip.style.display = 'block';
+
+            // Create a function to position the tooltip near the mouse
+            // Store it so we can remove it later
+            positionTooltipHandler = function(e) {
+                positionTooltip(e);
+            };
+            
+            // Listen for mouse movement to update tooltip position
+            document.addEventListener('mousemove', positionTooltipHandler);
+            
+            console.log('Tooltip shown for word:', displayWord);
+        }
+
+        function positionTooltip(e) {
+            // Get the tooltip element
+            const tooltip = document.getElementById('tooltip');
+            if (!tooltip || tooltip.style.display === 'none') {
+                return;
+            }
+            
+            // Calculate tooltip position (10 pixels to the right and below mouse)
+            let left = e.clientX + 15;
+            let top = e.clientY + 15;
+            
+            // Get tooltip dimensions (need to make it visible first to measure)
+            const wasVisible = tooltip.style.display !== 'none';
+            if (!wasVisible) {
+                tooltip.style.visibility = 'hidden';
+                tooltip.style.display = 'block';
+            }
+            
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            // Adjust if tooltip would go off the right edge
+            if (left + tooltipRect.width > windowWidth - 10) {
+                left = e.clientX - tooltipRect.width - 15;
+            }
+            
+            // Adjust if tooltip would go off the bottom edge
+            if (top + tooltipRect.height > windowHeight - 10) {
+                top = e.clientY - tooltipRect.height - 15;
+            }
+            
+            // Ensure tooltip doesn't go off the left or top edges
+            if (left < 10) left = 10;
+            if (top < 10) top = 10;
+            
+            // Restore visibility if we hid it for measurement
+            if (!wasVisible) {
+                tooltip.style.visibility = 'visible';
+            }
+            
+            // Set the tooltip position using fixed positioning
+            tooltip.style.left = left + 'px';
+            tooltip.style.top = top + 'px';
+        }
+
+        function hideTooltip() {
+            // Get the tooltip element
+            const tooltip = document.getElementById('tooltip');
+            
+            // Hide the tooltip
+            tooltip.style.display = 'none';
+            
+            // Remove the mouse movement listener to prevent memory leaks
+            if (positionTooltipHandler) {
+                document.removeEventListener('mousemove', positionTooltipHandler);
+                positionTooltipHandler = null;
+            }
+        }
+    </script>
+</body>
+</html>
